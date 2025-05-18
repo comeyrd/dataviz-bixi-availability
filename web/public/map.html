@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Bixi Station Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      height: 100vh;
+    }
+
+    #update-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px;
+      background-color: white;
+      border: 1px solid #ccc;
+      cursor: pointer;
+    }
+
+    #legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: sans-serif;
+      font-size: 14px;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    }
+
+    #legend h4 {
+      margin: 0 0 5px;
+    }
+
+    #legend div {
+      margin-bottom: 4px;
+    }
+
+    #legend span {
+      display: inline-block;
+      width: 20px;
+      height: 10px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+
+<body>
+  <h3 style="text-align:center; margin: 10px 0;">Carte des stations Bixi</h1>
+  <h5 style="text-align:center; margin: 10px 0;">Disponibilités des vélos non éléctriques en direct</h2>
+  <button id="update-btn">Update Bike Data</button>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    const map = L.map('map').setView([45.508, -73.587], 12);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | © OpenStreetMap',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    let pavingLayer;
+
+    // Smooth gradient color function based on bike availability
+    function getColor(bikes) {
+      if (bikes === null || bikes === undefined) return '#cccccc'; // gray
+
+      // Clamp bikes count to [0, 15]
+      const clamped = Math.max(0, Math.min(bikes, 15));
+
+      // Define color stops
+      const colorStops = [
+        { bikes: 0, color: [255, 0, 0] },       // Red
+        { bikes: 5, color: [255, 165, 0] },     // Orange
+        { bikes: 10, color: [255, 255, 0] },    // Yellow
+        { bikes: 15, color: [0, 128, 0] }       // Green
+      ];
+
+      // Find surrounding stops
+      let lower, upper;
+      for (let i = 0; i < colorStops.length - 1; i++) {
+        if (clamped >= colorStops[i].bikes && clamped <= colorStops[i + 1].bikes) {
+          lower = colorStops[i];
+          upper = colorStops[i + 1];
+          break;
+        }
+      }
+
+      // Linear interpolate RGB values
+      const range = upper.bikes - lower.bikes;
+      const t = (clamped - lower.bikes) / range;
+
+      const interp = (start, end) => Math.round(start + (end - start) * t);
+
+      const [r, g, b] = [
+        interp(lower.color[0], upper.color[0]),
+        interp(lower.color[1], upper.color[1]),
+        interp(lower.color[2], upper.color[2])
+      ];
+
+      return `rgb(${r},${g},${b})`;
+    }
+
+    // Update polygons styles and popups with live bike data
+    function updateBikeData() {
+      fetch('/api/bike-data')
+        .then(res => res.json())
+        .then(bikeData => {
+          pavingLayer.eachLayer(layer => {
+            console.log(layer)
+            const stationId = layer.feature.properties.station_id;
+            const bikes = bikeData[stationId];
+            const color = getColor(bikes);
+            layer.setStyle({ fillColor: color });
+            layer.bindPopup(`Station ID: ${stationId}<br>${layer.feature.properties.name}<br>Bikes available: ${bikes !== undefined ? bikes : 'N/A'}`);
+          });
+        })
+        .catch(err => console.error('Failed to update bike data:', err));
+    }
+
+    // Load GeoJSON, add to map, then update bike data
+    fetch('/paving_with_station_ids.geojson')
+      .then(res => res.json())
+      .then(geojsonData => {
+        pavingLayer = L.geoJson(geojsonData, {
+          style: feature => ({
+            color: 'blue',
+            weight: 0,
+            fillOpacity: 0.2,
+            fillColor: getColor(null)
+          }),
+          onEachFeature: function (feature, layer) {
+            const stationId = feature.properties.station_id;
+            layer.bindPopup(`Station ID: ${stationId}`);
+          }
+        }).addTo(map);
+        // Initial bike data update
+        updateBikeData();
+      })
+      .catch(err => console.error('Failed to load paving geojson:', err));
+
+    // Button to manually update bike data
+    document.getElementById('update-btn').addEventListener('click', updateBikeData);
+  </script>
+
+
+  <div id="legend">
+    <h4>Disponibilité des vélos</h4>
+    <div><span style="background:rgb(255,0,0)"></span> 0 vélos</div>
+    <div><span style="background:rgb(255,165,0)"></span> 5 vélos</div>
+    <div><span style="background:rgb(255,255,0)"></span> 10 vélos</div>
+    <div><span style="background:rgb(0,128,0)"></span> 15+ vélos</div>
+  </div>
+
+</body>
+
+</html>
