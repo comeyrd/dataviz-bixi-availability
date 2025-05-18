@@ -8,59 +8,7 @@
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    #map {
-      height: 90vh;
-    }
-
-    #map:focus {
-      outline: none;
-    }
-
-    #update-btn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1000;
-      padding: 10px;
-      background-color: white;
-      border: 1px solid #ccc;
-      cursor: pointer;
-    }
-
-    #legend {
-      position: absolute;
-      bottom: 30px;
-      right: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-family: sans-serif;
-      font-size: 14px;
-      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-    }
-
-    #legend h4 {
-      margin: 0 0 5px;
-    }
-
-    #legend div {
-      margin-bottom: 4px;
-    }
-
-    #legend span {
-      display: inline-block;
-      width: 20px;
-      height: 10px;
-      margin-right: 6px;
-      vertical-align: middle;
-    }
-
-    body {
-      -webkit-overflow-scrolling: touch;
-    }
-  </style>
+  <link rel="stylesheet" href="./custom.css" />
 </head>
 
 <body>
@@ -68,129 +16,14 @@
     <h3 style="text-align:center; margin: 10px 0;">Carte des stations Bixi</h3>
     <h5 style="text-align:center; margin: 10px 0;">Disponibilités des vélos non éléctriques en direct</h5>
     <button id="update-btn">Update Bike Data</button>
-    <span id="update-msg" style="margin-left:10px; font-size:14px; color:green; display:none;">Updating...</span>
+    <span id="update-msg" class="update-msg"></span>
   </div>
 
   <div id="map"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <script>
-    const map = L.map('map').setView([45.508, -73.587], 12);
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | © OpenStreetMap',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
-
-    let pavingLayer;
-
-    // Smooth gradient color function based on bike availability
-    function getColor(bikes) {
-      if (bikes === null || bikes === undefined) return '#cccccc'; // gray
-
-      // Clamp bikes count to [0, 15]
-      const clamped = Math.max(0, Math.min(bikes, 15));
-
-      // Define color stops
-      const colorStops = [
-        { bikes: 0, color: [255, 0, 0] },       // Red
-        { bikes: 5, color: [255, 165, 0] },     // Orange
-        { bikes: 10, color: [255, 255, 0] },    // Yellow
-        { bikes: 15, color: [0, 128, 0] }       // Green
-      ];
-
-      // Find surrounding stops
-      let lower, upper;
-      for (let i = 0; i < colorStops.length - 1; i++) {
-        if (clamped >= colorStops[i].bikes && clamped <= colorStops[i + 1].bikes) {
-          lower = colorStops[i];
-          upper = colorStops[i + 1];
-          break;
-        }
-      }
-
-      // Linear interpolate RGB values
-      const range = upper.bikes - lower.bikes;
-      const t = (clamped - lower.bikes) / range;
-
-      const interp = (start, end) => Math.round(start + (end - start) * t);
-
-      const [r, g, b] = [
-        interp(lower.color[0], upper.color[0]),
-        interp(lower.color[1], upper.color[1]),
-        interp(lower.color[2], upper.color[2])
-      ];
-
-      return `rgb(${r},${g},${b})`;
-    }
-    var lastUpdateTime = 0
-
-    // Update polygons styles and popups with live bike data
-    function updateBikeData() {
-      const msg = document.getElementById('update-msg');
-      const now = Date.now();
-      const secondsSinceLastUpdate = (now - lastUpdateTime) / 1000;
-
-      if (secondsSinceLastUpdate < 60) {
-        const waitSeconds = Math.ceil(60 - secondsSinceLastUpdate);
-        msg.style.color = 'red';
-        msg.textContent = `Please wait ${waitSeconds} second${waitSeconds > 1 ? 's' : ''} before updating.`;
-        msg.style.display = 'inline';
-        setTimeout(() => {
-          msg.style.display = 'none';
-        }, 3000);
-        return; // do not update yet
-      }
-      lastUpdateTime = now;
-      msg.style.color = 'green';
-      msg.textContent = 'Updating...';
-      msg.style.display = 'inline';
-
-      setTimeout(() => {
-        msg.style.display = 'none';
-      }, 1000);
-      fetch('/api/bike-data')
-        .then(res => res.json())
-        .then(bikeData => {
-          pavingLayer.eachLayer(layer => {
-            console.log(layer)
-            const stationId = layer.feature.properties.station_id;
-            const bikes = bikeData[stationId];
-            const color = getColor(bikes);
-            layer.setStyle({ fillColor: color });
-            layer.bindPopup(`Station ID: ${stationId}<br>${layer.feature.properties.name}<br>Bikes available: ${bikes !== undefined ? bikes : 'N/A'}`);
-          });
-        })
-        .catch(err => console.error('Failed to update bike data:', err));
-    }
-    // Load GeoJSON, add to map, then update bike data
-    fetch('/paving_with_station_ids.geojson')
-      .then(res => res.json())
-      .then(geojsonData => {
-        pavingLayer = L.geoJson(geojsonData, {
-          style: feature => ({
-            color: 'grey',
-            weight: 0.01,
-            fillOpacity: 0.2,
-            fillColor: getColor(null)
-          }),
-          onEachFeature: function (feature, layer) {
-            const stationId = feature.properties.station_id;
-            layer.bindPopup(`Station ID: ${stationId}`);
-          }
-        }).addTo(map);
-        // Initial bike data update
-        updateBikeData();
-      })
-      .catch(err => console.error('Failed to load paving geojson:', err));
-
-    // Button to manually update bike data
-    document.getElementById('update-btn').addEventListener('click', updateBikeData);
-  </script>
-
+  <script src="maplogic.js"></script>
 
   <div id="legend">
     <h4>Disponibilité des vélos</h4>
