@@ -10,7 +10,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     #map {
-      height: 100vh;
+      height: 90vh;
+    }
+
+    #map:focus {
+      outline: none;
     }
 
     #update-btn {
@@ -52,13 +56,21 @@
       margin-right: 6px;
       vertical-align: middle;
     }
+
+    body {
+      -webkit-overflow-scrolling: touch;
+    }
   </style>
 </head>
 
 <body>
-  <h3 style="text-align:center; margin: 10px 0;">Carte des stations Bixi</h1>
-  <h5 style="text-align:center; margin: 10px 0;">Disponibilités des vélos non éléctriques en direct</h2>
-  <button id="update-btn">Update Bike Data</button>
+  <div>
+    <h3 style="text-align:center; margin: 10px 0;">Carte des stations Bixi</h3>
+    <h5 style="text-align:center; margin: 10px 0;">Disponibilités des vélos non éléctriques en direct</h5>
+    <button id="update-btn">Update Bike Data</button>
+    <span id="update-msg" style="margin-left:10px; font-size:14px; color:green; display:none;">Updating...</span>
+  </div>
+
   <div id="map"></div>
 
   <!-- Leaflet JS -->
@@ -114,9 +126,32 @@
 
       return `rgb(${r},${g},${b})`;
     }
+    var lastUpdateTime = 0
 
     // Update polygons styles and popups with live bike data
     function updateBikeData() {
+      const msg = document.getElementById('update-msg');
+      const now = Date.now();
+      const secondsSinceLastUpdate = (now - lastUpdateTime) / 1000;
+
+      if (secondsSinceLastUpdate < 60) {
+        const waitSeconds = Math.ceil(60 - secondsSinceLastUpdate);
+        msg.style.color = 'red';
+        msg.textContent = `Please wait ${waitSeconds} second${waitSeconds > 1 ? 's' : ''} before updating.`;
+        msg.style.display = 'inline';
+        setTimeout(() => {
+          msg.style.display = 'none';
+        }, 3000);
+        return; // do not update yet
+      }
+      lastUpdateTime = now;
+      msg.style.color = 'green';
+      msg.textContent = 'Updating...';
+      msg.style.display = 'inline';
+
+      setTimeout(() => {
+        msg.style.display = 'none';
+      }, 1000);
       fetch('/api/bike-data')
         .then(res => res.json())
         .then(bikeData => {
@@ -131,7 +166,6 @@
         })
         .catch(err => console.error('Failed to update bike data:', err));
     }
-
     // Load GeoJSON, add to map, then update bike data
     fetch('/paving_with_station_ids.geojson')
       .then(res => res.json())
