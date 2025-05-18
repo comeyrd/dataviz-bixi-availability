@@ -172,8 +172,8 @@
       .then(geojsonData => {
         pavingLayer = L.geoJson(geojsonData, {
           style: feature => ({
-            color: 'blue',
-            weight: 0,
+            color: 'grey',
+            weight: 0.01,
             fillOpacity: 0.2,
             fillColor: getColor(null)
           }),
