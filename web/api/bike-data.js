@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const url = "https://gbfs.velobixi.com/gbfs/en/station_status.json";
 
   try {
@@ -19,4 +19,4 @@ export default async function handler(req, res) {
       details: error.message,
     });
   }
-}
+};
