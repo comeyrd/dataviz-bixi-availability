@@ -2,3 +2,7 @@
 bixivenv
 node_modules
 .vercel
+station_information.json
+station_status.json
+system_information.json
+__pycache__

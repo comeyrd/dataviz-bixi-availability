@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GeoJSON Point Collector</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    #map { height: 80vh; }
+    button { margin: 10px; padding: 10px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h3>Click on the map to add points. Click a marker to remove it.</h3>
+  <div id="map"></div>
+  <button onclick="downloadGeoJSON()">Download GeoJSON</button>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script>
+    const map = L.map('map').setView([0, 0], 2);
+    const features = [];
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      const marker = L.marker([lat, lng]).addTo(map);
+      const feature = {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [lng, lat]
+        },
+        properties: {}
+      };
+
+      features.push({ marker, feature });
+
+      marker.on('click', function() {
+        map.removeLayer(marker);
+        const index = features.findIndex(f => f.marker === marker);
+        if (index !== -1) {
+          features.splice(index, 1);
+        }
+      });
+    });
+
+    function downloadGeoJSON() {
+      const geojson = {
+        type: "FeatureCollection",
+        features: features.map(f => f.feature)
+      };
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], {type: "application/json"});
+      saveAs(blob, "points.geojson");
+    }
+  </script>
+</body>
+</html>
