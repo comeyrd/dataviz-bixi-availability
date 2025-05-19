@@ -7,17 +7,22 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
   maxZoom: 19,
 }).addTo(map);
 
-map.on('drag', () => {
+map.on("drag", () => {
   map.fitBounds(map.getBounds());
 });
-const canvasRenderer = L.canvas();
+const bikeIcon = L.icon({
+  iconUrl: "./bike.svg",
+  iconSize: [10, 10], // or whatever size you want
+  iconAnchor: [5, 5], // center the icon (optional)
+  className: "", // optional: suppress default styles
+});
 
 let pavingLayer;
 
 var lastUpdateTime = 0;
 var to_wait = 0;
 const msg = document.getElementById("update-msg");
-
+var stations_layer;
 const updating = "Updating...";
 
 // Smooth gradient color function based on bike availability
@@ -111,7 +116,6 @@ fetch("/paving_with_station_ids.geojson")
   .then((res) => res.json())
   .then((geojsonData) => {
     pavingLayer = L.geoJson(geojsonData, {
-      renderer: canvasRenderer,
       style: (feature) => ({
         color: "grey",
         weight: 0.01,
@@ -128,5 +132,32 @@ fetch("/paving_with_station_ids.geojson")
   })
   .catch((err) => console.error("Failed to load paving geojson:", err));
 
+fetch("/stations_and_positions.geojson")
+  .then((res) => res.json())
+  .then((geojsonData) => {
+    stations_layer = L.geoJSON(geojsonData, {
+      pointToLayer: function (feature, latlng) {
+        return L.marker(latlng, { icon: bikeIcon });
+      },
+    });
+    updateMarkerVisibility();
+
+    // Listen for zoom changes
+    map.on("zoomend", updateMarkerVisibility);
+  })
+  .catch((err) => console.error("Failed to load paving geojson:", err));
+
 // Button to manually update bike data
 document.getElementById("update-btn").addEventListener("click", updateBikeData);
+
+function updateMarkerVisibility() {
+  if (map.getZoom() >= 14) {
+    if (!map.hasLayer(stations_layer)) {
+      map.addLayer(stations_layer);
+    }
+  } else {
+    if (map.hasLayer(stations_layer)) {
+      map.removeLayer(stations_layer);
+    }
+  }
+}
