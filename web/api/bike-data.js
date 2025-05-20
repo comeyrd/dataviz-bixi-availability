@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
 
     const simplified = {};
     stations.forEach((station) => {
-      simplified[station.station_id] = station.num_bikes_available;
+      simplified[station.station_id] = station.num_bikes_available - station.num_ebikes_available;
     });
 
     res.status(200).json(simplified);
