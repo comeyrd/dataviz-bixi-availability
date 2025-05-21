@@ -1,4 +1,7 @@
-const map = L.map("map").setView([45.508, -73.587], 12);
+const map = L.map("map", { renderer: L.canvas() }).setView(
+  [45.508, -73.587],
+  12
+);
 
 L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
   attribution:
@@ -10,6 +13,11 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
 map.on("drag", () => {
   map.fitBounds(map.getBounds());
 });
+
+map.on("zoom", () => {
+  map.fitBounds(map.getBounds());
+});
+
 const bikeIcon = L.icon({
   iconUrl: "./bike.svg",
   iconSize: [10, 10], // or whatever size you want
@@ -25,45 +33,41 @@ const msg = document.getElementById("update-msg");
 var stations_layer;
 const updating = "Updating...";
 
-// Smooth gradient color function based on bike availability
-function getColor(bikes) {
-  if (bikes === null || bikes === undefined) return "#cccccc"; // gray
+const max_bikes = 50;
+const color_array = [];
+const grey = "#cccccc";
 
-  // Clamp bikes count to [0, 15]
-  const clamped = Math.max(0, Math.min(bikes, 15));
-
-  // Define color stops
-  const colorStops = [
-    { bikes: 0, color: [255, 0, 0] }, // Red
-    { bikes: 5, color: [255, 165, 0] }, // Orange
-    { bikes: 10, color: [255, 255, 0] }, // Yellow
-    { bikes: 15, color: [0, 128, 0] }, // Green
+function generate_color_array() {
+  const red = [255, 0, 0];
+  const orange = [255, 165, 0];
+  const yellow = [255, 255, 0];
+  const green = [0, 128, 0];
+  const interp_color = (start, end, t) => Math.round(start + (end - start) * t);
+  const interp_rgb = (start, end, t) => [
+    interp_color(start[0], end[0], t),
+    interp_color(start[1], end[1], t),
+    interp_color(start[2], end[2], t),
   ];
-
-  // Find surrounding stops
-  let lower, upper;
-  for (let i = 0; i < colorStops.length - 1; i++) {
-    if (clamped >= colorStops[i].bikes && clamped <= colorStops[i + 1].bikes) {
-      lower = colorStops[i];
-      upper = colorStops[i + 1];
-      break;
+  for (let n_bikes = 0; n_bikes < max_bikes; n_bikes++) {
+    bike_color = [];
+    if (n_bikes == 0) {
+      bike_color = red;
+    } else if (n_bikes < 5) {
+      bike_color = interp_rgb(red, orange, n_bikes / 5);
+    } else if (n_bikes < 10) {
+      bike_color = interp_rgb(orange, yellow, (n_bikes - 5) / 5);
+    } else if (n_bikes < 15) {
+      bike_color = interp_rgb(yellow, green, (n_bikes - 10) / 5);
+    } else {
+      bike_color = green;
     }
+    color_array[
+      n_bikes
+    ] = `rgb(${bike_color[0]},${bike_color[1]},${bike_color[2]})`;
   }
-
-  // Linear interpolate RGB values
-  const range = upper.bikes - lower.bikes;
-  const t = (clamped - lower.bikes) / range;
-
-  const interp = (start, end) => Math.round(start + (end - start) * t);
-
-  const [r, g, b] = [
-    interp(lower.color[0], upper.color[0]),
-    interp(lower.color[1], upper.color[1]),
-    interp(lower.color[2], upper.color[2]),
-  ];
-
-  return `rgb(${r},${g},${b})`;
 }
+
+generate_color_array();
 
 function can_update() {
   const now = Date.now();
@@ -81,7 +85,7 @@ function color_map(bikeData) {
   pavingLayer.eachLayer((layer) => {
     const stationId = layer.feature.properties.station_id;
     const bikes = bikeData[stationId];
-    const color = getColor(bikes);
+    const color = color_array[bikes];
     layer.setStyle({ fillColor: color });
     layer.bindPopup(
       `Station ID: ${stationId}<br>${
@@ -90,7 +94,7 @@ function color_map(bikeData) {
     );
   });
 }
-// Update polygons styles and popups with live bike data
+
 function updateBikeData() {
   if (can_update()) {
     msg.textContent = updating;
@@ -111,24 +115,23 @@ function updateBikeData() {
     msg.textContent = " ";
   }, 1000);
 }
-// Load GeoJSON, add to map, then update bike data
+
 fetch("/paving_with_station_ids.geojson")
   .then((res) => res.json())
   .then((geojsonData) => {
-    pavingLayer = L.geoJson(geojsonData, {
-      style: (feature) => ({
-        color: "grey",
-        weight: 0.01,
-        fillOpacity: 0.2,
-        fillColor: getColor(null),
-      }),
-      onEachFeature: function (feature, layer) {
-        const stationId = feature.properties.station_id;
-        layer.bindPopup(`Station ID: ${stationId}`);
-      },
-    }).addTo(map);
-    // Initial bike data update
-    updateBikeData();
+    fetch("/api/bike-data")
+      .then((res) => res.json())
+      .then((bikeData) => {
+        pavingLayer = L.geoJson(geojsonData, {
+          style: (feature) => ({
+            color: "grey",
+            weight: 0.01,
+            fillOpacity: 0.2,
+            fillColor: color_array[bikeData[feature.properties.station_id]],
+            bindPopup: `Station ID: ${feature.properties.station_id}`,
+          }),
+        }).addTo(map);
+      });
   })
   .catch((err) => console.error("Failed to load paving geojson:", err));
 
@@ -142,16 +145,16 @@ fetch("/stations_and_positions.geojson")
     });
     updateMarkerVisibility();
 
-    // Listen for zoom changes
+    map.on("zoom", updateMarkerVisibility);
     map.on("zoomend", updateMarkerVisibility);
   })
+
   .catch((err) => console.error("Failed to load paving geojson:", err));
 
-// Button to manually update bike data
 document.getElementById("update-btn").addEventListener("click", updateBikeData);
 
 function updateMarkerVisibility() {
-  if (map.getZoom() >= 14) {
+  if (map.getZoom() >= 15) {
     if (!map.hasLayer(stations_layer)) {
       map.addLayer(stations_layer);
     }
@@ -174,12 +177,16 @@ function getLocation() {
 
 function success(position) {
   map.panTo([position.coords.latitude, position.coords.longitude]);
-  var circle = L.circle([position.coords.latitude, position.coords.longitude], 50, {
-    weight: 1,
-    color: "blue",
-    fillColor: "blue",
-    fillOpacity: 1,
-  });
+  var circle = L.circle(
+    [position.coords.latitude, position.coords.longitude],
+    50,
+    {
+      weight: 1,
+      color: "blue",
+      fillColor: "blue",
+      fillOpacity: 1,
+    }
+  );
   map.addLayer(circle);
 }
 
