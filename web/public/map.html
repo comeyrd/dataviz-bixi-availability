@@ -13,10 +13,18 @@
 
 <body>
   <div>
-    <h3 style="text-align:center; margin: 10px 0;">Carte des stations Bixi</h3>
-    <h5 style="text-align:center; margin: 10px 0;">Disponibilités des vélos non éléctriques en direct</h5>
-    <button id="update-btn">Update Bike Data</button>
-    <span id="update-msg" class="update-msg"></span>
+    <div id="btn-div" class="btn-div">
+        <button id="update-btn" class="custom-btn">Update Bike Data</button>
+        <button id="gps-btn" class="custom-btn">Ask for GPS</button>
+    </div>
+
+    <div>
+      <h3 id="title">Carte des stations Bixi</h3>
+      <h5 id="title">Disponibilités des vélos non éléctriques en direct</h5>
+      <span id="update-msg" class="update-msg"> </span>
+    </div>
+    
+
   </div>
 
   <div id="map"></div>

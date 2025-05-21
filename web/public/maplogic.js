@@ -161,3 +161,27 @@ function updateMarkerVisibility() {
     }
   }
 }
+
+document.getElementById("update-btn").addEventListener("click", updateBikeData);
+
+function getLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(success);
+  } else {
+    console.log("Geolocation is not supported by this browser.");
+  }
+}
+
+function success(position) {
+  map.panTo([position.coords.latitude, position.coords.longitude]);
+  var circle = L.circle([position.coords.latitude, position.coords.longitude], 50, {
+    weight: 1,
+    color: "blue",
+    fillColor: "blue",
+    fillOpacity: 1,
+  });
+  map.addLayer(circle);
+}
+
+document.getElementById("gps-btn").addEventListener("click", getLocation);
+getLocation();
