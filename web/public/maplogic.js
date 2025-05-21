@@ -88,9 +88,9 @@ function color_map(bikeData) {
     const color = color_array[bikes];
     layer.setStyle({ fillColor: color });
     layer.bindPopup(
-      `Station ID: ${stationId}<br>${
-        layer.feature.properties.name
-      }<br>Bikes available: ${bikes !== undefined ? bikes : "N/A"}`
+      `${layer.feature.properties.name}<br>Bikes available: ${
+        bikes !== undefined ? bikes : "N/A"
+      }`
     );
   });
 }
@@ -128,9 +128,19 @@ fetch("/paving_with_station_ids.geojson")
             weight: 0.01,
             fillOpacity: 0.2,
             fillColor: color_array[bikeData[feature.properties.station_id]],
-            bindPopup: `Station ID: ${feature.properties.station_id}`,
           }),
         }).addTo(map);
+
+        pavingLayer.eachLayer((layer) => {
+          layer.bindPopup(
+            `${layer.feature.properties.name}<br>Bikes available: ${
+              bikeData[layer.feature.properties.station_id] !== undefined
+                ? bikeData[layer.feature.properties.station_id]
+                : "N/A"
+            }`
+          );
+        });
+        lastUpdateTime = Date.now();
       });
   })
   .catch((err) => console.error("Failed to load paving geojson:", err));
@@ -169,13 +179,13 @@ document.getElementById("update-btn").addEventListener("click", updateBikeData);
 
 function getLocation() {
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(success);
+    navigator.geolocation.getCurrentPosition(got_geoloc);
   } else {
     console.log("Geolocation is not supported by this browser.");
   }
 }
 
-function success(position) {
+function got_geoloc(position) {
   map.panTo([position.coords.latitude, position.coords.longitude]);
   var circle = L.circle(
     [position.coords.latitude, position.coords.longitude],
