@@ -42,7 +42,7 @@ function generate_color_array() {
   const orange = [255, 165, 0];
   const yellow = [255, 255, 0];
   const green = [0, 128, 0];
-  const grey_ = [150,10,10];
+  const grey_ = [50,10,10];
   const interp_color = (start, end, t) => Math.round(start + (end - start) * t);
   const interp_rgb = (start, end, t) => [
     interp_color(start[0], end[0], t),
