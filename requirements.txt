@@ -3,3 +3,7 @@ pandas
 geopandas
 ipykernel
 scipy
+psycopg2-binary
+dotenv
+sqlalchemy
+matplotlib

@@ -6,3 +6,4 @@ station_information.json
 station_status.json
 system_information.json
 __pycache__
+.env
